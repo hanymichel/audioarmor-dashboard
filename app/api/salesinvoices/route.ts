@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 type SalesInvoicesInput = {
@@ -16,62 +15,58 @@ type SalesInvoicesInput = {
   notes: string
 }
 
-function parseNumberField(
-  value: string | number | null | undefined
-) {
-  if (value === undefined || value === null || value === '') {
-    return null
-  }
-
-  const parsed = Number(value)
-
-  return Number.isFinite(parsed) ? parsed : null
-}
-
 export async function GET() {
   try {
-    // Create authenticated Supabase client
-    const supabase = await createClient()
-
-    // Check logged-in user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Get sales invoices
-    const { data, error } = await supabaseAdmin
+    const { data: invoices, error: invoicesError } = await supabaseAdmin
       .from('sales_invoices')
       .select('*')
       .order('id', { ascending: true })
 
-    if (error) {
+    if (invoicesError) {
       console.error(
-        'GET /api/salesinvoices error:',
-        error
+        'GET /api/salesinvoices invoices error:',
+        invoicesError.message
       )
 
       return NextResponse.json(
-        { error: error.message },
+        { error: invoicesError.message },
         { status: 400 }
       )
     }
 
-    return NextResponse.json(
-      data ?? [],
-      { status: 200 }
+    const { data: customers, error: customersError } = await supabaseAdmin
+      .from('customers')
+      .select('id, customer_name')
+
+    if (customersError) {
+      console.error(
+        'GET /api/salesinvoices customers error:',
+        customersError.message
+      )
+
+      return NextResponse.json(
+        { error: customersError.message },
+        { status: 400 }
+      )
+    }
+
+    const customerMap = new Map(
+      (customers || []).map((customer) => [
+        String(customer.id),
+        customer.customer_name,
+      ])
     )
+
+    const result = (invoices || []).map((invoice) => ({
+      ...invoice,
+      customer_name:
+        customerMap.get(String(invoice.customer_id)) ||
+        'Unknown Customer',
+    }))
+
+    return NextResponse.json(result)
   } catch (error) {
-    console.error(
-      'GET /api/salesinvoices server error:',
-      error
-    )
+    console.error('GET /api/salesinvoices error:', error)
 
     return NextResponse.json(
       { error: 'Server error' },
@@ -82,66 +77,58 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    // Create authenticated Supabase client
-    const supabase = await createClient()
-
-    // Check logged-in user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    // Read request body
     const body = (await req.json()) as SalesInvoicesInput
 
-    // Validate required fields
-    if (
-      !body.invoice_number?.trim() ||
-      !body.customer_id?.trim()
-    ) {
+    if (!body.invoice_number?.trim() || !body.customer_id?.trim()) {
       return NextResponse.json(
-        {
-          error:
-            'Invoice number and customer ID are required.',
-        },
+        { error: 'Invoice number and customer ID are required.' },
         { status: 400 }
       )
     }
 
-    // Parse numeric fields
+    const parseNumberField = (value: string | undefined) => {
+      if (value === undefined || value === null || value === '') {
+        return null
+      }
+
+      const parsed = Number(value)
+
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
     const subtotal = parseNumberField(body.subtotal)
     const discount = parseNumberField(body.discount)
     const tax = parseNumberField(body.tax)
     const shipping = parseNumberField(body.shipping)
-    const totalAmount = parseNumberField(
-      body.total_amount
-    )
-
-    // Calculate total if one was not provided
-    const discountedSubtotal =
-      subtotal !== null
-        ? subtotal -
-          (subtotal * (discount ?? 0)) / 100
-        : null
+    const totalAmount = parseNumberField(body.total_amount)
 
     const computedTotal =
-      discountedSubtotal !== null
-        ? discountedSubtotal +
-          (discountedSubtotal * (tax ?? 0)) / 100 +
+      subtotal !== null
+        ? subtotal -
+          (subtotal * (discount ?? 0)) / 100 +
+          ((subtotal - (subtotal * (discount ?? 0)) / 100) *
+            (tax ?? 0)) /
+            100 +
           (shipping ?? 0)
         : null
 
-    const finalTotal =
-      totalAmount ?? computedTotal
+    const salesInvoice = {
+      invoice_number: body.invoice_number.trim(),
+      customer_id: body.customer_id.trim(),
+      invoice_date:
+        body.invoice_date?.trim() ||
+        new Date().toISOString().split('T')[0],
+      subtotal,
+      discount,
+      tax,
+      shipping,
+      total_amount: totalAmount ?? computedTotal,
+      description: body.description?.trim() || null,
+      payment_status: body.payment_status?.trim() || 'pending',
+      notes: body.notes?.trim() || null,
+    }
 
-    // Total must exist
-    if (finalTotal === null) {
+    if (salesInvoice.total_amount === null) {
       return NextResponse.json(
         {
           error:
@@ -151,40 +138,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // Prepare invoice
-    const salesInvoice = {
-      invoice_number:
-        body.invoice_number.trim(),
-
-      customer_id:
-        body.customer_id.trim(),
-
-      invoice_date:
-        body.invoice_date?.trim() ||
-        new Date().toISOString().split('T')[0],
-
-      subtotal,
-      discount: discount ?? 0,
-      tax: tax ?? 0,
-      shipping: shipping ?? 0,
-      total_amount: finalTotal,
-
-      description:
-        body.description?.trim() || null,
-
-      payment_status:
-        body.payment_status?.trim() ||
-        'pending',
-
-      notes:
-        body.notes?.trim() || null,
-    }
-
-    // Insert invoice
-    const {
-      data,
-      error,
-    } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('sales_invoices')
       .insert([salesInvoice])
       .select()
@@ -193,7 +147,7 @@ export async function POST(req: Request) {
     if (error) {
       console.error(
         'POST /api/salesinvoices insert error:',
-        error
+        error.message
       )
 
       return NextResponse.json(
@@ -210,10 +164,7 @@ export async function POST(req: Request) {
       { status: 201 }
     )
   } catch (error) {
-    console.error(
-      'POST /api/salesinvoices error:',
-      error
-    )
+    console.error('POST /api/salesinvoices error:', error)
 
     return NextResponse.json(
       { error: 'Server error' },

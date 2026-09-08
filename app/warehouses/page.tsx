@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-type warehouse_summary = {
+type WarehouseSummary = {
   id: number
   warehouse_name: string
   sku_count: number
@@ -10,8 +10,8 @@ type warehouse_summary = {
   inventory_value: number | null
 }
 
-export default function warehousesPage() {
-  const [warehouse_summary, setWarehouses] = useState<warehouse_summary[]>([])
+export default function WarehousesPage() {
+  const [warehouseSummary, setWarehouses] = useState<WarehouseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -20,7 +20,9 @@ export default function warehousesPage() {
       .then(async (response) => {
         if (!response.ok) {
           const message = await response.text()
-          setError(message || `Could not load warehouses (${response.status}).`)
+          setError(
+            message || `Could not load warehouses (${response.status}).`
+          )
           setLoading(false)
           return
         }
@@ -30,7 +32,11 @@ export default function warehousesPage() {
         setLoading(false)
       })
       .catch((requestError) => {
-        setError(requestError instanceof Error ? requestError.message : 'Could not load warehouses.')
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Could not load warehouses.'
+        )
         setLoading(false)
       })
   }, [])
@@ -40,7 +46,11 @@ export default function warehousesPage() {
   }
 
   if (error) {
-    return <div className="p-6 text-red-400">Error loading warehouses: {error}</div>
+    return (
+      <div className="p-6 text-red-400">
+        Error loading warehouses: {error}
+      </div>
+    )
   }
 
   return (
@@ -49,37 +59,82 @@ export default function warehousesPage() {
         <h1 className="text-3xl font-bold">
           Warehouses
         </h1>
+
         <a
           href="/newwarehouse"
-          className="bg-purple-600 px-4 py-2 rounded text-white"
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white font-medium transition"
         >
           New Warehouse
         </a>
       </div>
 
-      <table className="w-full">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>SKU Count</th>
-            <th>Total Units</th>
-            <th>Inventory Value</th>
-          </tr>
-        </thead>
+      <div className="w-full overflow-x-auto rounded-lg border border-gray-700">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-800">
+              <th className="border border-gray-700 px-4 py-3 text-left font-semibold whitespace-nowrap">
+                ID
+              </th>
 
-        <tbody>
-          {warehouse_summary.map(warehouse_summary => (
-            <tr key={warehouse_summary.id}>
-              <td>{warehouse_summary.id}</td>
-              <td>{warehouse_summary.warehouse_name}</td>
-              <td>{warehouse_summary.sku_count}</td>
-              <td>{warehouse_summary.total_units}</td>
-              <td>{warehouse_summary.inventory_value}</td>
+              <th className="border border-gray-700 px-4 py-3 text-left font-semibold">
+                Name
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-right font-semibold whitespace-nowrap">
+                SKU Count
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-right font-semibold whitespace-nowrap">
+                Total Units
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-right font-semibold whitespace-nowrap">
+                Inventory Value
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {warehouseSummary.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={5}
+                  className="border border-gray-700 px-4 py-6 text-center text-gray-400"
+                >
+                  No warehouses found.
+                </td>
+              </tr>
+            ) : (
+              warehouseSummary.map((warehouse) => (
+                <tr
+                  key={warehouse.id}
+                  className="hover:bg-gray-800/50 transition"
+                >
+                  <td className="border border-gray-700 px-4 py-3 text-left whitespace-nowrap">
+                    {warehouse.id}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3 text-left">
+                    {warehouse.warehouse_name}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3 text-right whitespace-nowrap">
+                    {warehouse.sku_count}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3 text-right whitespace-nowrap">
+                    {warehouse.total_units ?? 0}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3 text-right whitespace-nowrap">
+                    ${Number(warehouse.inventory_value ?? 0).toFixed(2)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

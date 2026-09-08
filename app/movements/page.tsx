@@ -7,43 +7,107 @@ type Movement = {
   created_at: string
   product: string | null
   sku: string | null
-  warehouse_id: string | null
+  warehouse: string | null
+  warehouse_id: number | null
+  destination_warehouse: string | null
+  destination_warehouse_id: number | null
   movement_type: string
   quantity: number
   notes: string | null
+  reference_type: string | null
 }
 
 export default function MovementsPage() {
-  const [movements, setMovements] = useState<Movement[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [movements, setMovements] =
+    useState<Movement[]>([])
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [error, setError] =
+    useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/movements', { credentials: 'same-origin' })
-      .then(async (response) => {
-        const data = await response.json()
+    async function loadMovements() {
+      try {
+        setLoading(true)
+        setError(null)
 
-        if (!response.ok) {
-          setError(data.error ?? 'Could not load stock movements.')
-          setLoading(false)
-          return
+        const response = await fetch(
+          '/api/movements',
+          {
+            credentials: 'same-origin',
+            cache: 'no-store',
+          }
+        )
+
+        const text =
+          await response.text()
+
+        let data: any
+
+        try {
+          data = JSON.parse(text)
+        } catch {
+          console.error(
+            'API did not return JSON:',
+            text
+          )
+
+          throw new Error(
+            `API returned ${response.status} ${response.statusText}.`
+          )
         }
 
-        setMovements(data)
+        if (!response.ok) {
+          throw new Error(
+            data.error ??
+              'Could not load stock movements.'
+          )
+        }
+
+        setMovements(
+          Array.isArray(data)
+            ? data
+            : []
+        )
+      } catch (requestError) {
+        console.error(
+          'Stock movements error:',
+          requestError
+        )
+
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Could not load stock movements.'
+        )
+      } finally {
         setLoading(false)
-      })
-      .catch((requestError) => {
-        setError(requestError.message)
-        setLoading(false)
-      })
+      }
+    }
+
+    loadMovements()
   }, [])
 
   if (loading) {
-    return <div>Loading stock movements...</div>
+    return (
+      <div className="p-6">
+        Loading stock movements...
+      </div>
+    )
   }
 
   if (error) {
-    return <div className="text-red-400">Error loading stock movements: {error}</div>
+    return (
+      <div className="p-6">
+        <div className="rounded-lg border border-red-700 bg-red-950/30 p-4 text-red-400">
+          Error loading stock movements:
+          {' '}
+          {error}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -52,55 +116,100 @@ export default function MovementsPage() {
         <h1 className="text-3xl font-bold">
           Stock Movements
         </h1>
+
         <a
           href="/newmovement"
-          className="bg-purple-600 px-4 py-2 rounded text-white"
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white font-medium transition"
         >
           New Movement
         </a>
       </div>
 
-      <table className="w-full">
+      <div className="w-full overflow-x-auto rounded-lg border border-gray-700">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-zinc-800">
+              <th className="border border-gray-700 px-4 py-3 text-left whitespace-nowrap">
+                Date
+              </th>
 
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>SKU</th>
-            <th>Warehouse</th>
-            <th>Type</th>
-            <th>Qty</th>
-            <th>Notes</th>
-          </tr>
-        </thead>
+              <th className="border border-gray-700 px-4 py-3 text-left">
+                Product
+              </th>
 
-        <tbody>
-          {movements.length === 0 ? (
-            <tr>
-              <td colSpan={6} className="py-4 text-center text-zinc-400">
-                No stock movements found
-              </td>
+              <th className="border border-gray-700 px-4 py-3 text-left">
+                SKU
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-left">
+                Warehouse
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-left">
+                Type
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-right">
+                Qty
+              </th>
+
+              <th className="border border-gray-700 px-4 py-3 text-left">
+                Notes
+              </th>
             </tr>
-          ) : (
-            movements.map((movement) => (
-              <tr key={movement.id}>
-                <td>
-                  {new Date(movement.created_at).toLocaleDateString()}
+          </thead>
+
+          <tbody>
+            {movements.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="border border-gray-700 px-4 py-6 text-center text-zinc-400"
+                >
+                  No stock movements found.
                 </td>
+              </tr>
+            ) : (
+              movements.map((movement) => (
+                <tr
+                  key={movement.id}
+                  className="hover:bg-zinc-800/50"
+                >
+                  <td className="border border-gray-700 px-4 py-3 whitespace-nowrap">
+                    {new Date(
+                      movement.created_at
+                    ).toLocaleDateString()}
+                  </td>
 
-                <td>{movement.product || '-'}</td>
-                <td>{movement.sku || '-'}</td>
-                <td>{movement.warehouse_id || '-'}</td>
-                <td>{movement.movement_type}</td>
-                <td>{movement.quantity}</td>
-                <td>{movement.notes || '-'}</td>
-                <td>{movement.created_at}</td>
+                  <td className="border border-gray-700 px-4 py-3">
+                    {movement.product || '-'}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3">
+                    {movement.sku || '-'}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3">
+                    {movement.warehouse || '-'}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3">
+                    {movement.movement_type}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3 text-right whitespace-nowrap">
+                    {movement.quantity}
+                  </td>
+
+                  <td className="border border-gray-700 px-4 py-3">
+                    {movement.notes || '-'}
+                  </td>
                 </tr>
-            ))
-          )}
-        </tbody>
-
-      </table>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
