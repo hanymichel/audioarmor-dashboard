@@ -24,10 +24,10 @@ export default function NewMovementPage() {
   }, [])
 
   async function loadData() {
-    const productsRes = await fetch("/api/products")
+    const productsRes = await fetch("/api/products", { credentials: 'same-origin' })
     const productsData = await productsRes.json()
 
-    const warehousesRes = await fetch("/api/warehouses")
+    const warehousesRes = await fetch("/api/warehouses", { credentials: 'same-origin' })
     const warehousesData = await warehousesRes.json()
 
     setProducts(productsData || [])
@@ -46,6 +46,7 @@ export default function NewMovementPage() {
 
   const res = await fetch("/api/movements", {
     method: "POST",
+    credentials: 'same-origin',
     headers: {
       "Content-Type": "application/json",
     },
@@ -201,7 +202,7 @@ export default function NewMovementPage() {
         </div>
 
         <div>
-          <label>Unit Cost</label>
+          <label>Unit Cost $</label>
 
           <input
             type="number"
@@ -233,7 +234,7 @@ export default function NewMovementPage() {
             <option value="">
               Select
             </option>
-
+            <option value="RETURN">RETURN</option>
             <option value="PURCHASE_ORDER">
               Purchase Order
             </option>

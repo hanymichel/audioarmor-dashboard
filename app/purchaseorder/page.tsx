@@ -24,7 +24,8 @@ export default function PurchaseOrderPage() {
 
   async function loadSuppliers() {
     const res = await fetch(
-      "/api/suppliers"
+      "/api/suppliers",
+      { credentials: 'same-origin' }
     )
 
     const data = await res.json()
@@ -34,7 +35,8 @@ export default function PurchaseOrderPage() {
 
   async function loadProducts() {
     const res = await fetch(
-      "/api/products"
+      "/api/products",
+      { credentials: 'same-origin' }
     )
 
     const data = await res.json()
@@ -78,6 +80,7 @@ export default function PurchaseOrderPage() {
       "/api/purchaseorders",
       {
         method: "POST",
+        credentials: 'same-origin',
         headers: {
           "Content-Type":
             "application/json"

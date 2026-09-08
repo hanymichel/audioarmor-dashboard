@@ -1,76 +1,152 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 type SupplierInput = {
   name?: string
   contact_name?: string
-  email?: string
   phone?: string
+  email?: string
   address?: string
-  city?: string
   country?: string
-  tax_number?: string
   notes?: string
-  
-}
-
-function toNullableNumber(value: SupplierInput[keyof SupplierInput]) {
-  if (value === undefined || value === null || value === '') {
-    return null
-  }
-
-  const numericValue = Number(value)
-  return Number.isFinite(numericValue) ? numericValue : null
 }
 
 export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from('suppliers')
-    .select('*')
-    .order('id', { ascending: true })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
-  }
-
-  return NextResponse.json(data)
-}
-
-export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as SupplierInput
+    // Create authenticated Supabase client
+    const supabase = await createClient()
 
-    if (!body.name?.trim() || !body.contact_name?.trim()) {
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
       return NextResponse.json(
-        { error: 'Supplier name and contact name are required.' },
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get suppliers
+    const { data, error } = await supabaseAdmin
+      .from('suppliers')
+      .select('*')
+      .order('id', { ascending: true })
+
+    if (error) {
+      console.error(
+        'GET /api/suppliers error:',
+        error
+      )
+
+      return NextResponse.json(
+        { error: error.message },
         { status: 400 }
       )
     }
 
+    return NextResponse.json(
+      data ?? [],
+      { status: 200 }
+    )
+  } catch (error) {
+    console.error(
+      'GET /api/suppliers server error:',
+      error
+    )
+
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    // Create authenticated Supabase client
+    const supabase = await createClient()
+
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Read request body
+    const body = (await req.json()) as SupplierInput
+
+    // Validate required fields
+    if (
+      !body.name?.trim() ||
+      !body.contact_name?.trim()
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            'Supplier name and contact name are required.',
+        },
+        { status: 400 }
+      )
+    }
+
+    // Prepare supplier data
     const supplier = {
       name: body.name.trim(),
       contact_name: body.contact_name.trim(),
-      email: body.email?.trim(),
-      phone: body.phone?.trim(),
-      address: body.address?.trim(),
-      city: body.city?.trim(),
-      country: body.country?.trim(),
-      tax_number: body.tax_number?.trim(),
-      notes: body.notes?.trim()
+      email: body.email?.trim() || null,
+      phone: body.phone?.trim() || null,
+      address: body.address?.trim() || null,
+      country: body.country?.trim() || null,
+      notes: body.notes?.trim() || null,
     }
 
-    const { data, error } = await supabaseAdmin
+    // Insert supplier
+    const {
+      data,
+      error,
+    } = await supabaseAdmin
       .from('suppliers')
       .insert(supplier)
       .select()
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      console.error(
+        'POST /api/suppliers insert error:',
+        error
+      )
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ success: true, supplier: data }, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: true,
+        supplier: data,
+      },
+      { status: 201 }
+    )
+  } catch (error) {
+    console.error(
+      'POST /api/suppliers server error:',
+      error
+    )
+
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    )
   }
 }

@@ -1,5 +1,6 @@
 'use client'
-
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 import { FormEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -25,6 +26,7 @@ export default function NewSupplierPage() {
 
       const response = await fetch("/api/suppliers", {
         method: "POST",
+        credentials: 'same-origin',
         headers: {
           "Content-Type": "application/json",
         },

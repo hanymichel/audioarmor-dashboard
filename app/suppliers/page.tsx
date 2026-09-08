@@ -20,7 +20,7 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
 
   useEffect(() => {
-    fetch('/api/suppliers')
+    fetch('/api/suppliers', { credentials: 'same-origin' })
       .then(async (response) => {
         const data = await response.json()
 

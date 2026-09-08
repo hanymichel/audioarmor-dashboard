@@ -1,5 +1,4 @@
-"use client"
-
+"use client";
 import { useEffect, useState } from "react"
 
 export default function SalesInvoicesPage() {
@@ -8,7 +7,7 @@ export default function SalesInvoicesPage() {
 
   async function loadInvoices() {
     try {
-      const res = await fetch("/api/salesinvoices")
+      const res = await fetch("/api/salesinvoices", { credentials: 'same-origin' })
 
       if (!res.ok) {
         const message = await res.text()
@@ -42,21 +41,40 @@ export default function SalesInvoicesPage() {
     return <div className="p-6">Loading...</div>
   }
 
+  const sortedInvoices = [...invoices].sort((a, b) => {
+    const dateA = a.invoice_date ? new Date(a.invoice_date).getTime() : 0
+    const dateB = b.invoice_date ? new Date(b.invoice_date).getTime() : 0
+    return dateB - dateA
+  })
+
+  const totalSales = invoices.reduce((sum, invoice) => sum + (Number(invoice.total_amount) || 0), 0)
+  const formattedTotalSales = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(totalSales)
+
   return (
     <div className="p-6">
-      <div className="flex justify-between mb-6">
-
-        <h1 className="text-3xl font-bold">
-          Sales Invoices
-        </h1>
+      <div className="flex items-center justify-between mb-6">
+        
+          
+            <h1 className="text-3xl font-bold">
+              Sales Invoices
+            </h1>
+            <div className="flex items-baseline gap-2">
+            <div className="flex-1 flex justify-center">
+            <span className="text-lg text-zinc-300">
+              {formattedTotalSales}
+            </span>
+          </div>
+        </div>
 
         <a
           href="/newsalesinvoice"
-          className="bg-purple-600 px-4 py-2 rounded text-white"
+          className="bg-purple-600 px-4 py-2 rounded text-white font-bold hover:bg-purple-700 transition-colors"
         >
           New Invoice
         </a>
-
       </div>
 
       <table className="w-full border">
@@ -77,7 +95,7 @@ export default function SalesInvoicesPage() {
         </thead>
 
         <tbody>
-          {invoices.map((invoice) => (
+          {sortedInvoices.map((invoice) => (
             <tr
               key={invoice.id}
               className="border-t"
@@ -87,7 +105,9 @@ export default function SalesInvoicesPage() {
               </td>
 
               <td className="p-3">
-                {invoice.invoice_date}
+                {invoice.invoice_date
+                ? new Date(invoice.invoice_date).toLocaleDateString()
+                : "-"}
               </td>
 
               <td className="p-3">

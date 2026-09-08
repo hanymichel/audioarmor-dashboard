@@ -19,7 +19,7 @@ export default function MovementsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/movements')
+    fetch('/api/movements', { credentials: 'same-origin' })
       .then(async (response) => {
         const data = await response.json()
 
@@ -94,7 +94,8 @@ export default function MovementsPage() {
                 <td>{movement.movement_type}</td>
                 <td>{movement.quantity}</td>
                 <td>{movement.notes || '-'}</td>
-              </tr>
+                <td>{movement.created_at}</td>
+                </tr>
             ))
           )}
         </tbody>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 type ProductInput = {
@@ -22,26 +23,77 @@ function toNullableNumber(value: ProductInput[keyof ProductInput]) {
   }
 
   const numericValue = Number(value)
-  return Number.isFinite(numericValue) ? numericValue : null
+
+  return Number.isFinite(numericValue)
+    ? numericValue
+    : null
 }
 
 export async function GET() {
-  const { data, error } = await supabaseAdmin
-    .from('products')
-    .select('*')
-    .order('id', { ascending: true })
+  try {
+    // Get authenticated Supabase client
+    const supabase = await createClient()
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get products
+    const { data, error } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .order('id', { ascending: true })
+
+    if (error) {
+      console.error('GET /api/products error:', error)
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(data ?? [], { status: 200 })
+
+  } catch (error) {
+    console.error('GET /api/products server error:', error)
+
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json(data)
 }
 
 export async function POST(req: Request) {
   try {
+    // Get authenticated Supabase client
+    const supabase = await createClient()
+
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Get request body
     const body = (await req.json()) as ProductInput
 
+    // Validate required fields
     if (!body.name?.trim() || !body.sku?.trim()) {
       return NextResponse.json(
         { error: 'Product name and SKU are required.' },
@@ -49,6 +101,7 @@ export async function POST(req: Request) {
       )
     }
 
+    // Prepare product data
     const product = {
       name: body.name.trim(),
       sku: body.sku.trim(),
@@ -61,9 +114,11 @@ export async function POST(req: Request) {
       color: body.color?.trim() || null,
       description: body.description?.trim() || null,
       image_url: body.image_url?.trim() || null,
-      low_stock_threshold: toNullableNumber(body.low_stock_threshold) ?? 0,
+      low_stock_threshold:
+        toNullableNumber(body.low_stock_threshold) ?? 0,
     }
 
+    // Insert product
     const { data, error } = await supabaseAdmin
       .from('products')
       .insert(product)
@@ -71,11 +126,28 @@ export async function POST(req: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      console.error('POST /api/products error:', error)
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ success: true, product: data }, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: true,
+        product: data,
+      },
+      { status: 201 }
+    )
+
+  } catch (error) {
+    console.error('POST /api/products server error:', error)
+
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    )
   }
 }

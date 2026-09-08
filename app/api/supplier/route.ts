@@ -1,74 +1,191 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
+  try {
+    // Create authenticated Supabase client
+    const supabase = await createClient()
 
-  const id = searchParams.get("id")
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const { data, error } = await supabase
-    .from("suppliers")
-    .select("*")
-    .eq("id", id)
-    .single()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
-  if (error) {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Supplier ID is required.' },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('suppliers')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error) {
+      console.error(
+        'GET /api/suppliers error:',
+        error
+      )
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error(
+      'GET /api/suppliers server error:',
+      error
+    )
+
     return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
+      { error: 'Server error' },
+      { status: 500 }
     )
   }
-
-  return NextResponse.json(data)
 }
 
 export async function PUT(req: Request) {
-  const { searchParams } = new URL(req.url)
+  try {
+    // Create authenticated Supabase client
+    const supabase = await createClient()
 
-  const id = searchParams.get("id")
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const body = await req.json()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
-  const { data, error } = await supabase
-    .from("suppliers")
-    .update(body)
-    .eq("id", id)
-    .select()
-    .single()
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
 
-  if (error) {
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Supplier ID is required.' },
+        { status: 400 }
+      )
+    }
+
+    const body = await req.json()
+
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: 'Invalid request body.' },
+        { status: 400 }
+      )
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('suppliers')
+      .update(body)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error(
+        'PUT /api/suppliers error:',
+        error
+      )
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error(
+      'PUT /api/suppliers server error:',
+      error
+    )
+
     return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
+      { error: 'Server error' },
+      { status: 500 }
     )
   }
-
-  return NextResponse.json(data)
 }
 
 export async function DELETE(req: Request) {
-  const { searchParams } = new URL(req.url)
+  try {
+    // Create authenticated Supabase client
+    const supabase = await createClient()
 
-  const id = searchParams.get("id")
+    // Check logged-in user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  const { error } = await supabase
-    .from("suppliers")
-    .delete()
-    .eq("id", id)
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
-  if (error) {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Supplier ID is required.' },
+        { status: 400 }
+      )
+    }
+
+    const { error } = await supabaseAdmin
+      .from('suppliers')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error(
+        'DELETE /api/suppliers error:',
+        error
+      )
+
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+    })
+  } catch (error) {
+    console.error(
+      'DELETE /api/suppliers server error:',
+      error
+    )
+
     return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
+      { error: 'Server error' },
+      { status: 500 }
     )
   }
-
-  return NextResponse.json({
-    success: true
-  })
 }

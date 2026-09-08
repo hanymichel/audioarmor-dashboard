@@ -48,6 +48,7 @@ export default function NewProductPage() {
 
     const response = await fetch('/api/products', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form),
     })

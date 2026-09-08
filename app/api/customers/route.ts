@@ -4,7 +4,11 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from('customers')
-    .select('id, customer_name, email')
+    .select(`
+      id,
+      name:customer_name,
+      email
+    `)
     .order('customer_name', { ascending: true })
 
   if (error) {

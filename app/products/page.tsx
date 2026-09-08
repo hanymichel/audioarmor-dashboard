@@ -44,7 +44,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
 
   useEffect(() => {
-    fetch('/api/products')
+    fetch('/api/products', { credentials: 'same-origin' })
       .then(async (response) => {
         const data = await response.json()
 
@@ -61,53 +61,56 @@ export default function ProductsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">
+        <div className="flex-1" />
+        <h1 className="text-3xl font-bold text-center flex-1">
           Products
         </h1>
         <a
           href="/newproduct"
-          className="bg-purple-600 px-4 py-2 rounded text-white"
+          className="bg-purple-600 px-4 py-2 rounded text-white hover:bg-purple-700 transition-colors"
         >
           New Product
         </a>
       </div>
 
-      <table className="w-full">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>SKU</th>
-            <th>Cost</th>
-            <th>Price</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {products.map(product => (
-            <tr key={product.id}>
-              <td>{product.id}</td>
-              <td>
-                {product.image_url ? (
-                  <a
-                    href={getImageUrl(product.image_url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    {product.name}
-                  </a>
-                ) : (
-                  product.name
-                )}
-              </td>
-              <td>{product.sku}</td>
-              <td>{product.cost_price}</td>
-              <td>{product.selling_price}</td>
+      <div className="overflow-x-auto rounded-lg border border-zinc-700 bg-black shadow-sm">
+        <table className="w-full border-collapse text-sm text-white">
+          <thead className="bg-black">
+            <tr>
+              <th className="border border-zinc-700 px-4 py-3 text-center font-bold text-white">ID</th>
+              <th className="border border-zinc-700 px-4 py-3 text-left font-bold text-white">Name</th>
+              <th className="border border-zinc-700 px-4 py-3 text-center font-bold text-white">SKU</th>
+              <th className="border border-zinc-700 px-4 py-3 text-center font-bold text-white">Cost</th>
+              <th className="border border-zinc-700 px-4 py-3 text-center font-bold text-white">Price</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+
+          <tbody>
+            {products.map(product => (
+              <tr key={product.id} className="odd:bg-black even:bg-zinc-900">
+                <td className="border border-zinc-700 px-4 py-3 text-center font-semibold text-white">{product.id}</td>
+                <td className="border border-zinc-700 px-4 py-3 font-semibold text-white">
+                  {product.image_url ? (
+                    <a
+                      href={getImageUrl(product.image_url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-white underline decoration-white decoration-2 hover:no-underline"
+                    >
+                      {product.name}
+                    </a>
+                  ) : (
+                    product.name
+                  )}
+                </td>
+                <td className="border border-zinc-700 px-4 py-3 text-center font-semibold text-white">{product.sku}</td>
+                <td className="border border-zinc-700 px-4 py-3 text-center font-semibold text-white">{product.cost_price}</td>
+                <td className="border border-zinc-700 px-4 py-3 text-center font-semibold text-white">{product.selling_price}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

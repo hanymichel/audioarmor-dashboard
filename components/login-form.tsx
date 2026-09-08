@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase/client'
 
 export function LoginForm() {
   const router = useRouter()
+  const supabase = createClient()
+
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,8 +25,8 @@ export function LoginForm() {
 
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: username,
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: username.trim(),
       password,
     })
 
@@ -34,7 +37,13 @@ export function LoginForm() {
       return
     }
 
-    router.push('/dashboard')
+    if (!data.session) {
+      setMessage('Login succeeded, but no session was created.')
+      return
+    }
+
+    router.replace('/dashboard')
+    router.refresh()
   }
 
   return (
@@ -77,8 +86,17 @@ export function LoginForm() {
         disabled={loading}
         className="inline-flex w-full items-center justify-center rounded-2xl bg-teal-500 px-4 py-3 text-sm font-semibold text-black transition hover:bg-teal-400 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? 'Signing in…' : 'Sign in'}
+        {loading ? 'Signing in...' : 'Sign in'}
       </button>
+
+      <div className="mt-4 text-center text-sm text-zinc-400">
+        <Link
+          href="/auth/forgot-password"
+          className="font-medium text-teal-400 hover:text-teal-300"
+        >
+          Forgot password?
+        </Link>
+      </div>
     </form>
   )
 }

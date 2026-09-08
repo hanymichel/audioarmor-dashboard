@@ -2,107 +2,133 @@
 
 import { useEffect, useState } from 'react'
 
-type Expense = {
+type ExpenseItem = {
   id: number
-  expense_date: string
-  category: string
-  description: string
-  amount: number
-  payment_method: string
-  supplier_id: number
-  created_at: string
+  expense_date: string | null
+  category: string | null
+  description: string | null
+  amount: number | null
+  payment_method: string | null
+  supplier_id: string | null
 }
 
 export default function ExpensesPage() {
-  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [expenses, setExpenses] = useState<ExpenseItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const totalExpenses = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
+  const formattedTotalExpenses = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(totalExpenses)
+  useEffect(() => {
+    async function loadExpenses() {
+      try {
+        const response = await fetch('/api/expenses', { credentials: 'same-origin' })
+        const data = await response.json()
 
-  async function loadExpenses() {
-    const res = await fetch('/api/expenses')
-    const data = await res.json()
+        if (!response.ok) {
+          setError(data.error ?? 'Could not load expenses.')
+          return
+        }
 
-    if (Array.isArray(data)) {
-      setExpenses(data)
-    } else {
-      console.error('Expected array, got:', data)
-      setExpenses([])
+        setExpenses(data)
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    setLoading(false)
-  }
-
-  useEffect(() => {
     loadExpenses()
   }, [])
 
   if (loading) {
-    return <div className="p-6">Loading...</div>
+    return <div className="p-6">Loading expenses...</div>
   }
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + (parseFloat(exp.amount as any) || 0), 0)
+  if (error) {
+    return (
+      <div className="p-6 text-red-400">
+        Error loading expenses: {error}
+      </div>
+    )
+  }
 
   return (
     <div className="p-6">
-      <div className="flex justify-between mb-6 items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Expenses</h1>
-          <p className="text-xl text-amber-400 mt-2">
-            Total: ${totalExpenses.toFixed(2)}
-          </p>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Expenses</h1>
+        <div className="flex items-baseline gap-2">
+            <div className="flex-1 flex justify-center">
+            <span className="text-lg text-zinc-300">
+              {formattedTotalExpenses}
+            </span>
+          </div>
         </div>
 
         <a
           href="/newexpense"
-          className="bg-purple-600 px-4 py-2 rounded text-white hover:bg-purple-700"
+          className="rounded bg-purple-600 px-4 py-2 text-white hover:bg-purple-500"
         >
           New Expense
         </a>
       </div>
 
-      {expenses.length === 0 ? (
-        <div className="bg-zinc-900 p-6 rounded-xl text-center text-zinc-400">
-          No expenses recorded yet.
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-zinc-800">
-                <th className="p-3 text-left border border-zinc-700">Date</th>
-                <th className="p-3 text-left border border-zinc-700">Category</th>
-                <th className="p-3 text-left border border-zinc-700">Description</th>
-                <th className="p-3 text-left border border-zinc-700">Amount</th>
-                <th className="p-3 text-left border border-zinc-700">Payment Method</th>
-                <th className="p-3 text-left border border-zinc-700">Supplier ID</th>
+      <p className="mb-4 text-sm text-zinc-400">
+        {expenses.length} expense(s)
+      </p>
+
+      <div className="overflow-hidden rounded-xl bg-zinc-900">
+        <table className="w-full">
+          <thead className="bg-zinc-800">
+            <tr>
+              <th className="p-4 text-left">Date</th>
+              <th className="p-4 text-left">Category</th>
+              <th className="p-4 text-left">Description</th>
+              <th className="p-4 text-right">Amount</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {expenses.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={4}
+                  className="p-4 text-center text-zinc-400"
+                >
+                  No expenses found.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {expenses.map((expense) => (
-                <tr key={expense.id} className="border-t border-zinc-700 hover:bg-zinc-800">
-                  <td className="p-3 border border-zinc-700">{expense.expense_date}</td>
-                  <td className="p-3 border border-zinc-700">
-                    <span className="bg-zinc-700 px-2 py-1 rounded text-xs">
-                      {expense.category}
-                    </span>
+            ) : (
+              expenses.map((item) => (
+                <tr
+                  key={item.id}
+                  className="border-t border-zinc-800"
+                >
+                  <td className="p-4">
+                    {item.expense_date
+                      ? new Date(item.expense_date).toLocaleDateString()
+                      : "-"}
                   </td>
-                  <td className="p-3 border border-zinc-700 text-sm text-zinc-300">
-                    {expense.description || '-'}
+
+                  <td className="p-4">
+                    {item.category ?? "-"}
                   </td>
-                  <td className="p-3 border border-zinc-700 text-red-400 font-semibold">
-                    ${parseFloat(expense.amount as any).toFixed(2)}
+
+                  <td className="p-4">
+                    {item.description ?? "-"}
                   </td>
-                  <td className="p-3 border border-zinc-700 text-sm">
-                    {expense.payment_method || '-'}
-                  </td>
-                  <td className="p-3 border border-zinc-700 text-sm">
-                    {expense.supplier_id || '-'}
+
+                  <td className="p-4 text-right">
+                    ${(item.amount ?? 0).toFixed(2)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

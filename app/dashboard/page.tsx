@@ -2,8 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
+import SalesExpensesChart from "@/components/graphs/SalesExpensesChart"
+import SalesProfitChart from "@/components/graphs/SalesProfitChart"
+import CashFlowPie from "@/components/graphs/CashFlowPie"
+import SalesYoYChart from "@/components/graphs/SalesYoYChart"
 
-type warehouse = {
+type Product = {
   id: number
   name: string
   cost_price: number
@@ -15,9 +19,15 @@ type InventoryItem = {
 }
 
 type SalesInvoice = {
-  total_amount: number
-  subtotal: number
-  payment_status: string
+  total_amount: number | null
+  subtotal: number | null
+  payment_status: string | null
+  invoice_date: string | null
+}
+
+type Expense = {
+  amount: number | null
+  expense_date: string | null
 }
 
 export default function DashboardPage() {
@@ -36,6 +46,22 @@ export default function DashboardPage() {
 
   const [lowStockCount, setLowStockCount] = useState(0)
   const [lowStockProducts, setLowStockProducts] = useState<string[]>([])
+
+  const [salesExpensesData, setSalesExpensesData] = useState<
+    { month: string; sales: number; expenses: number }[]
+  >([])
+
+  const [salesProfitData, setSalesProfitData] = useState<
+    { month: string; sales: number; profit: number }[]
+  >([])
+
+  const [cashFlowData, setCashFlowData] = useState<
+    { name: string; value: number }[]
+  >([])
+
+  const [salesYoYData, setSalesYoYData] = useState<
+    { month: string; currentYear: number; lastYear: number }[]
+  >([])
 
   useEffect(() => {
     loadDashboard()
@@ -74,70 +100,265 @@ export default function DashboardPage() {
 
       // ---------------------------------------------------
       // SALES INVOICES
+      // Use the API route so the dashboard gets the same
+      // server-side Supabase data as the invoices page.
       // ---------------------------------------------------
 
-      const { data: invoices } = await supabase
-        .from("sales_invoices")
-        .select(`
-          total_amount,
-          subtotal,
-          payment_status
-        `)
+      const invoicesResponse = await fetch("/api/salesinvoices", {
+        cache: "no-store",
+      })
 
-      if (invoices) {
-        const totalSalesAmount = invoices.reduce(
-          (sum, invoice: any) =>
+      const invoicesResult = await invoicesResponse.json()
+
+      if (!invoicesResponse.ok) {
+        throw new Error(
+          invoicesResult?.error || "Could not load sales invoices"
+        )
+      }
+
+      const invoices: SalesInvoice[] = Array.isArray(invoicesResult)
+        ? invoicesResult
+        : []
+
+      // ---------------------------------------------------
+      // EXPENSES
+      // Use the existing expenses API route.
+      // ---------------------------------------------------
+
+      const expensesResponse = await fetch("/api/expenses", {
+        cache: "no-store",
+      })
+
+      const expensesResult = await expensesResponse.json()
+
+      if (!expensesResponse.ok) {
+        throw new Error(
+          expensesResult?.error || "Could not load expenses"
+        )
+      }
+
+      const expensesData: Expense[] = Array.isArray(expensesResult)
+        ? expensesResult
+        : []
+
+      // ---------------------------------------------------
+      // SALES TOTAL
+      // ---------------------------------------------------
+
+      const totalSalesAmount = invoices.reduce(
+        (sum, invoice) =>
+          sum + Number(invoice.total_amount || 0),
+        0
+      )
+
+      setTotalSales(totalSalesAmount)
+
+      // ---------------------------------------------------
+      // PENDING SALES
+      // ---------------------------------------------------
+
+      const pendingAmount = invoices
+        .filter((invoice) => {
+          const status = String(
+            invoice.payment_status || ""
+          )
+            .trim()
+            .toLowerCase()
+
+          return status === "pending"
+        })
+        .reduce(
+          (sum, invoice) =>
             sum + Number(invoice.total_amount || 0),
           0
         )
 
-        setTotalSales(totalSalesAmount)
+      setPendingSalesAmount(pendingAmount)
 
-        const pendingAmount = invoices
-          .filter(
-            (invoice: any) =>
-              invoice.payment_status?.toLowerCase() ===
-              "pending"
+      // ---------------------------------------------------
+      // ORDERS
+      // ---------------------------------------------------
+
+      setTotalOrders(invoices.length)
+
+      // ---------------------------------------------------
+      // EXPENSES TOTAL
+      // ---------------------------------------------------
+
+      const expensesSum = expensesData.reduce(
+        (sum, expense) =>
+          sum + Number(expense.amount || 0),
+        0
+      )
+
+      setTotalExpenses(expensesSum)
+
+      // ---------------------------------------------------
+      // PROFIT
+      // ---------------------------------------------------
+
+      const estimatedCOGS = invoices.reduce(
+        (sum, invoice) =>
+          sum +
+          Number(invoice.subtotal || 0) * 0.6,
+        0
+      )
+
+      setTotalProfit(
+        totalSalesAmount - estimatedCOGS
+      )
+
+      // ---------------------------------------------------
+      // CHART DATA
+      // ---------------------------------------------------
+
+      const currentYear = new Date().getFullYear()
+      const lastYear = currentYear - 1
+
+      const monthLabels = Array.from(
+        { length: 12 },
+        (_, index) => {
+          const date = new Date(
+            currentYear,
+            index,
+            1
           )
-          .reduce(
-            (sum, invoice: any) =>
-              sum + Number(invoice.total_amount || 0),
-            0
-          )
 
-        setPendingSalesAmount(pendingAmount)
+          return {
+            key: `${date.toLocaleString("en", {
+              month: "short",
+            })} ${date.getFullYear()}`,
 
-        setTotalOrders(invoices.length)
-
-        const estimatedCOGS = invoices.reduce(
-          (sum, invoice: any) =>
-            sum +
-            Number(invoice.subtotal || 0) *
-              0.6,
-          0
-        )
-
-        // keep profit calculation based on estimated COGS
-        setTotalProfit(
-          totalSalesAmount - estimatedCOGS
-        )
-
-        // load actual recorded expenses from expenses table
-        try {
-          const { data: expensesData } = await supabase
-            .from("expenses")
-            .select(`amount`)
-
-          const expensesSum = (expensesData || []).reduce(
-            (sum: number, e: any) => sum + Number(e.amount || 0),
-            0
-          )
-
-          setTotalExpenses(expensesSum)
-        } catch (err) {
-          console.error("Failed to load expenses:", err)
+            label: date.toLocaleString("en", {
+              month: "short",
+            }),
+          }
         }
-      }
+      )
+
+      const salesByMonth = new Map<string, number>()
+      const expensesByMonth = new Map<string, number>()
+      const profitByMonth = new Map<string, number>()
+      const lastYearSalesByMonth =
+        new Map<string, number>()
+
+      invoices.forEach((invoice) => {
+        const invoiceDate = invoice.invoice_date
+          ? new Date(invoice.invoice_date)
+          : new Date()
+
+        const monthKey = `${invoiceDate.toLocaleString(
+          "en",
+          {
+            month: "short",
+          }
+        )} ${invoiceDate.getFullYear()}`
+
+        const salesValue = Number(
+          invoice.total_amount || 0
+        )
+
+        if (
+          invoiceDate.getFullYear() ===
+          currentYear
+        ) {
+          salesByMonth.set(
+            monthKey,
+            (salesByMonth.get(monthKey) || 0) +
+              salesValue
+          )
+
+          profitByMonth.set(
+            monthKey,
+            (profitByMonth.get(monthKey) || 0) +
+              salesValue -
+              Number(invoice.subtotal || 0) *
+                0.6
+          )
+        }
+
+        if (
+          invoiceDate.getFullYear() ===
+          lastYear
+        ) {
+          lastYearSalesByMonth.set(
+            monthKey,
+            (lastYearSalesByMonth.get(monthKey) || 0) +
+              salesValue
+          )
+        }
+      })
+
+      expensesData.forEach((expense) => {
+        const expenseDate = expense.expense_date
+          ? new Date(expense.expense_date)
+          : new Date()
+
+        const monthKey = `${expenseDate.toLocaleString(
+          "en",
+          {
+            month: "short",
+          }
+        )} ${expenseDate.getFullYear()}`
+
+        expensesByMonth.set(
+          monthKey,
+          (expensesByMonth.get(monthKey) || 0) +
+            Number(expense.amount || 0)
+        )
+      })
+
+      setSalesExpensesData(
+        monthLabels.map(({ key, label }) => ({
+          month: label,
+          sales: salesByMonth.get(key) || 0,
+          expenses:
+            expensesByMonth.get(key) || 0,
+        }))
+      )
+
+      setSalesProfitData(
+        monthLabels.map(({ key, label }) => ({
+          month: label,
+          sales: salesByMonth.get(key) || 0,
+          profit:
+            profitByMonth.get(key) || 0,
+        }))
+      )
+
+      setSalesYoYData(
+        monthLabels.map(({ key, label }) => ({
+          month: label,
+          currentYear:
+            salesByMonth.get(key) || 0,
+          lastYear:
+            lastYearSalesByMonth.get(key) || 0,
+        }))
+      )
+
+      // ---------------------------------------------------
+      // CASH FLOW
+      // ---------------------------------------------------
+
+      setCashFlowData([
+        {
+          name: "Cash Flow",
+          value: Math.max(
+            totalSalesAmount -
+              expensesSum -
+              pendingAmount,
+            0
+          ),
+        },
+        {
+          name: "Pending Payments",
+          value: pendingAmount,
+        },
+        {
+          name: "Upcoming Expenses",
+          value: expensesSum,
+        },
+      ])
 
       // ---------------------------------------------------
       // INVENTORY VALUE
@@ -150,7 +371,7 @@ export default function DashboardPage() {
             product_id,
             quantity
           `)
-      
+
       const { data: productsData } =
         await supabase
           .from("products")
@@ -170,7 +391,7 @@ export default function DashboardPage() {
           (item: InventoryItem) => {
             const product =
               productsData.find(
-                (p: warehouse) =>
+                (p: Product) =>
                   p.id === item.product_id
               )
 
@@ -207,10 +428,10 @@ export default function DashboardPage() {
         )
 
         const names = lowStockData
-          .map((item: any) => {
+          .map((item: InventoryItem) => {
             const product =
               productsData.find(
-                (p: warehouse) =>
+                (p: Product) =>
                   p.id === item.product_id
               )
 
@@ -222,6 +443,17 @@ export default function DashboardPage() {
           names as string[]
         )
       }
+
+      console.log("Dashboard sales:", invoices)
+      console.log("Dashboard expenses:", expensesData)
+      console.log(
+        "Dashboard pending amount:",
+        pendingAmount
+      )
+      console.log(
+        "Dashboard expenses total:",
+        expensesSum
+      )
     } catch (error) {
       console.error(
         "Dashboard Error:",
@@ -266,6 +498,7 @@ export default function DashboardPage() {
       <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-4">
         <div className="rounded-xl bg-zinc-900 p-6">
           <h3>Total Sales</h3>
+
           <p className="mt-3 text-3xl text-green-400">
             ${totalSales.toFixed(2)}
           </p>
@@ -273,6 +506,7 @@ export default function DashboardPage() {
 
         <div className="rounded-xl bg-zinc-900 p-6">
           <h3>Pending Sales</h3>
+
           <p className="mt-3 text-3xl text-yellow-400">
             ${pendingSalesAmount.toFixed(2)}
           </p>
@@ -280,6 +514,7 @@ export default function DashboardPage() {
 
         <div className="rounded-xl bg-zinc-900 p-6">
           <h3>Total Orders</h3>
+
           <p className="mt-3 text-3xl text-blue-400">
             {totalOrders}
           </p>
@@ -287,6 +522,7 @@ export default function DashboardPage() {
 
         <div className="rounded-xl bg-zinc-900 p-6">
           <h3>Total Profit</h3>
+
           <p className="mt-3 text-3xl text-purple-400">
             ${totalProfit.toFixed(2)}
           </p>
@@ -298,6 +534,7 @@ export default function DashboardPage() {
       <div className="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="rounded-xl bg-zinc-900 p-6">
           <h3>Expenses</h3>
+
           <p className="mt-3 text-3xl text-red-400">
             ${totalExpenses.toFixed(2)}
           </p>
@@ -305,6 +542,7 @@ export default function DashboardPage() {
 
         <div className="rounded-xl bg-zinc-900 p-6">
           <h3>Inventory Value</h3>
+
           <p className="mt-3 text-3xl text-orange-400">
             ${inventoryValue.toFixed(2)}
           </p>
@@ -329,6 +567,28 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* CHARTS */}
+
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SalesExpensesChart
+          data={salesExpensesData}
+        />
+
+        <SalesProfitChart
+          data={salesProfitData}
+        />
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SalesYoYChart
+          data={salesYoYData}
+        />
+
+        <CashFlowPie
+          data={cashFlowData}
+        />
       </div>
     </div>
   )

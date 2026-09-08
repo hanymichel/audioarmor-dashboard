@@ -16,7 +16,7 @@ export default function warehousesPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/warehouse_summary')
+    fetch('/api/warehouse_summary', { credentials: 'same-origin' })
       .then(async (response) => {
         if (!response.ok) {
           const message = await response.text()

@@ -24,6 +24,7 @@ export default function NewWarehousePage() {
     try {
       const response = await fetch('/api/warehouses', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
         },
